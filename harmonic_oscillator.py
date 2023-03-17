@@ -49,4 +49,20 @@ class FCN(nn.Module):
 ###### Generate training data ######
 # We generate training data from a small portion of the analytical solution
 # (ground truth obtained from physics)
+d, w0 = 2, 20
 
+# get the analytical solution over the full domain
+x = torch.linspace(0,1,500).view(-1,1)
+y = oscillator(d, w0, x).view(-1,1)
+print("Analytical solution size = ", x.shape, " x ", y.shape)
+
+# slice out a small number of points from the LHS of the domain
+x_data = x[0:200:20]
+y_data = y[0:200:20]
+print("Size of sliced analytical solution = ", x_data.shape, " x ", y_data.shape)
+
+plt.figure()
+plt.plot(x, y, label="Exact solution")
+plt.scatter(x_data, y_data, color="tab:orange", label="Training data")
+plt.legend()
+plt.show()
