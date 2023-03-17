@@ -69,7 +69,7 @@ plt.legend()
 
 
 
-###### Neural Network ######
+###### Neural Network (NN) training ######
 # Train a regular (non-physics informed) neural network
 def plot_result(x,y,x_data,y_data,yh,xp=None):
     "Pretty plot training results"
@@ -112,7 +112,57 @@ for i in range(1000):
         plt.savefig(file, bbox_inches='tight', pad_inches=0.1, dpi=100, facecolor="white")
         files.append(file)
     
-        if (i+1) % 500 == 0: plt.show()
+        if (i+1) % 500 == 0: #plt.show()
         else: plt.close("all")
             
 save_gif_PIL("nn.gif", files, fps=20, loop=0)
+
+
+
+
+###### PINN training ######
+# Train physics informed neural network
+x_physics = torch.linspace(0,1,30).view(-1,1).requires_grad_(True)# sample locations over the problem domain
+mu, k = 2*d, w0**2
+
+torch.manual_seed(123)
+model = FCN(1,1,32,3)
+optimizer = torch.optim.Adam(model.parameters(),lr=1e-4)
+files = []
+for i in range(20000):
+    optimizer.zero_grad()
+    
+    # compute the "data loss"
+    yh = model(x_data)
+    loss1 = torch.mean((yh-y_data)**2)# use mean squared error
+    
+    # compute the "physics loss"
+    yhp = model(x_physics)
+    dx  = torch.autograd.grad(yhp, x_physics, torch.ones_like(yhp), create_graph=True)[0]# computes dy/dx
+    dx2 = torch.autograd.grad(dx,  x_physics, torch.ones_like(dx),  create_graph=True)[0]# computes d^2y/dx^2
+    physics = dx2 + mu*dx + k*yhp# computes the residual of the 1D harmonic oscillator differential equation
+    loss2 = (1e-4)*torch.mean(physics**2)
+    
+    # backpropagate joint loss
+    loss = loss1 + loss2# add two loss terms together
+    loss.backward()
+    optimizer.step()
+    
+    
+    # plot the result as training progresses
+    if (i+1) % 150 == 0: 
+        
+        yh = model(x).detach()
+        xp = x_physics.detach()
+        
+        plot_result(x,y,x_data,y_data,yh,xp)
+        
+        file = "plots/pinn/pinn_%.8i.png"%(i+1)
+        plt.savefig(file, bbox_inches='tight', pad_inches=0.1, dpi=100, facecolor="white")
+        files.append(file)
+        
+        if (i+1) % 6000 == 0: plt.show()
+        else: plt.close("all")
+            
+save_gif_PIL("pinn.gif", files, fps=20, loop=0)
+
